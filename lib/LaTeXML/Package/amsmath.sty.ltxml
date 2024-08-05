@@ -676,10 +676,10 @@ sub rearrangeLoneAMSAligned {
   return; }
 
 #======================================================================
-# set up a general macro to support variations on cases environments (see mathtools)
+# Set up a general macro to support variations on cases environments (see mathtools)
 
 # \lx@ams@cases{keyvals}{left}{right} body
-# keys are
+# Keys are:
 #  name  : the name of the environment (for reversion)
 #  meaning: the (presumed) meaning of the construct
 #  style : \textstyle or \displaystyle
@@ -690,7 +690,7 @@ DefMacro('\lx@end@ams@cases',
   '\lx@hidden@cr{}\lx@end@alignment\lx@end@gen@cases');
 
 # The logical structure for cases extracts the columns of the alignment
-# to give alternating value,condition (an empty condition is replaced by "otherwise" !?!?!)
+# to give alternating value, condition (an empty condition is replaced by "otherwise")
 DefConstructor('\lx@ams@cases@ RequiredKeyVals:lx@GEN DigestedBody',
   '<ltx:XMWrap>#left#2#right</ltx:XMWrap>',
   properties     => sub { %{ $_[1]->getKeyVals }; },
@@ -699,25 +699,32 @@ DefConstructor('\lx@ams@cases@ RequiredKeyVals:lx@GEN DigestedBody',
     if (my $point = $document->getElement->lastChild) {
       # Get the sequence of alternating (case, condition).
       # Expecting ltx:XMArray/ltx:XMRow/ltx:XMCell [should have /ltx:XMArg, but could be empty!!!]
-      my @cells = $document->findnodes('ltx:XMArray/ltx:XMRow/ltx:XMCell', $point);
-      my @stuff = map { ($_->hasChildNodes ? createXMRefs($document, element_nodes($_))
-          : ['ltx:XMText', {}, 'otherwise']) } @cells;
+      my @rows = $document->findnodes('ltx:XMArray/ltx:XMRow', $point);
+      my @stuff;
+      foreach my $row (@rows) {
+        my @cells = $row->findnodes('ltx:XMCell', $row);
+        my ($case, $condition) = map { $_->hasChildNodes ? createXMRefs($document, element_nodes($_)) : ['ltx:XMText', {}, 'otherwise'] } @cells;
+        push @stuff, ['ltx:XMApp', {}, ['ltx:XMTok', { meaning => 'case' }], $case, $condition];
+      }
       $document->replaceTree(['ltx:XMDual', {},
           ['ltx:XMApp', {}, ['ltx:XMTok', { meaning => 'cases' }], @stuff],
           $point],
-        $point); }
+        $point);
+    }
   },
   reversion => sub {
     my ($whatsit, $kv, $body) = @_;
     my $name = $kv->getValue('name');
     (T_CS('\begin'), T_BEGIN, Revert($name), T_END,
       Revert($body),
-      T_CS('\end'), T_BEGIN, Revert($name), T_END); });
+      T_CS('\end'), T_BEGIN, Revert($name), T_END);
+  });
 
 # NOTE: Use \lx@left,\lx@right here, to avoid the hidden grouping (see TeX.pool, \lx@hidden@bgroup)
 # NOTE: These defns have an  column spec [] (omit that for mathtools)
 DefMacro('\cases',    '\lx@ams@cases{name=cases,meaning=cases,left=\lx@left\{}');
 DefMacro('\endcases', '\lx@end@ams@cases');
+
 
 #======================================================================
 # Section 3.8 Adjusting tag placement
